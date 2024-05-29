@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="kr.bit.mapper.BoardMapper">
+	<!-- //게시판 전체목록 Get -->
+	<select id="getList" resultType="kr.bit.entity.Board" parameterType="kr.bit.entity.Criteria">
+		select * from tblBoard order by boardGroup desc, boardSequence asc<!-- 답글순서 추가 -->
+		limit #{pageStart}, #{perPageNum}
+	</select>
+	
+<!-- 게시글 등록 -->	
+	<!-- 1. 답글이아닌 부모글 등록할때 -->
+	<insert id="insert" parameterType="kr.bit.entity.Board">
+		insert into tblBoard(idx, memID, title, content, writer,boardGroup, boardSequence, boardLevel, boardAvailable)
+			select 
+				IFNULL(MAX(idx)+1, 1), #{memID}, #{title}, #{content}, #{writer},
+				IFNULL(MAX(boardGroup)+1, 0),0,0,1 
+			from tblBoard
+	</insert>
+	
+	<!-- 2. 동적 SQL을 이용해서 글을등록할때 -->
+	<insert id="insertSelectKey" parameterType="kr.bit.entity.Board">
+	                  <!--  주의 keyProperty값을 여러개 지정해줄 경우 쉼표뒤에 공백없이 붙여서 매핑변수를 나열한다.  idx, boardGroup  이렇게 중간에 띄어쓰면 에러난다. 반드시 붙여쓴다. idx,boardGroup   -->
+		<selectKey keyProperty="idx,boardGroup" resultType="kr.bit.entity.Board" order="BEFORE">
+			select 
+				IFNULL(MAX(idx)+1, 1) as idx,
+				IFNULL(MAX(boardGroup)+1, 0) as boardGroup
+			from tblBoard
+		</selectKey>
+		insert into 
+		tblBoard(idx, memID, title, content, writer,boardGroup, boardSequence, boardLevel, boardAvailable)
+		values(#{idx}, #{memID}, #{title}, #{content}, #{writer}, #{boardGroup},0,0,1)
+	</insert>
+	
+	<!-- 로그인 처리 -->
+	<select id="login" resultType="kr.bit.entity.Member" parameterType="kr.bit.entity.Member">
+		select * from tblMember where memID=#{memID} and memPwd=#{memPwd}
+	</select>
+	
+	<!-- 2. 동적 SQL을 이용해서 글을등록할때 -->
+	<insert id="register" parameterType="kr.bit.entity.Board">
+	                  <!--  주의 keyProperty값을 여러개 지정해줄 경우 쉼표뒤에 공백없이 붙여서 매핑변수를 나열한다.  idx, boardGroup  이렇게 중간에 띄어쓰면 에러난다. 반드시 붙여쓴다. idx,boardGroup   -->
+		<selectKey keyProperty="idx,boardGroup" resultType="kr.bit.entity.Board" order="BEFORE">
+			select 
+				IFNULL(MAX(idx)+1, 1) as idx,
+				IFNULL(MAX(boardGroup)+1, 0) as boardGroup
+			from tblBoard
+		</selectKey>
+		insert into 
+		tblBoard(idx, memID, title, content, writer,boardGroup, boardSequence, boardLevel, boardAvailable)
+		values(#{idx}, #{memID}, #{title}, #{content}, #{writer}, #{boardGroup},0,0,1)
+	</insert>
+	
+	<!-- 상세 / 수정폼 가져오기 -->	
+	<select id="read" resultType="kr.bit.entity.Board">
+		select * from tblBoard where idx = #{idx}
+	</select>
+	
+	<!-- 수정처리 -->
+	<update id="update" parameterType="kr.bit.entity.Board">
+		update tblBoard set title=#{title}, content=#{content}
+		where idx = #{idx}
+	</update>	
+	
+	<!-- 삭제처리 
+	<delete id="delete">
+		delete from tblBoard where idx = #{idx}
+	</delete> -->
+	
+	<!-- 삭제처리(댓글이존재하는 게시글도 있으니  이용여부를 '미 이용'으로 boardAvailable=0으로 변경) -->	
+	<delete id="delete">
+		update tblBoard set boardAvailable=0 where idx = #{idx}
+	</delete>
+	<!-- 대 댓글 처리 시작-->
+	<!-- 부모글의 BoardSequence보다 큰 BoardSequence 들은 모두 +1 해준다. -->
+	<update id="replySeqUpdate" parameterType="kr.bit.entity.Board">
+		update tblBoard set boardSequence = boardSequence +1
+		where boardGroup = #{boardGroup} and boardSequence > #{boardSequence}
+	</update>	
+
+	<insert id="replyInsert" parameterType="kr.bit.entity.Board">
+		<selectKey keyProperty="idx" resultType="kr.bit.entity.Board" order="BEFORE">
+			select 
+				IFNULL(MAX(idx)+1, 1) as idx
+			from tblBoard
+		</selectKey>
+		insert into 
+		tblBoard(idx, memID, title, content, writer,boardGroup, boardSequence, boardLevel, boardAvailable)
+		values(#{idx}, #{memID}, #{title}, #{content}, #{writer}, #{boardGroup},#{boardSequence},#{boardLevel},1)	
+	</insert>
+	
+	<!-- 총게시글 수  -->	
+	<select id="totalCount" resultType="int">
+		select count(*) from tblBoard
+	</select>
+</mapper>
